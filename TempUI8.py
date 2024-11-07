@@ -2,6 +2,7 @@
 import os
 import glob
 import time
+import threading
 import pygame
 from pygame.locals import *
 
@@ -11,13 +12,13 @@ pygame.init()
 # Hide the mouse cursor
 pygame.mouse.set_visible(False)
 
-# Set up display (adjust resolution to match your display)
+# Set up display
 screen = pygame.display.set_mode((1024, 600), pygame.FULLSCREEN)
 
 # Set up fonts for title and temperature
-title_font = pygame.font.Font(None, 100)  # Font for the title
-temp_font = pygame.font.Font(None, 60)   # Font for temperature
-settings_font = pygame.font.Font(None, 40)  # Smaller font for Settings screen text
+title_font = pygame.font.Font(None, 120)  # Font for the title
+temp_font = pygame.font.Font(None, 80)    # Font for temperature
+settings_font = pygame.font.Font(None, 60)  # Smaller font for Settings screen text
 
 # Define colors
 WHITE = (255, 255, 255)
@@ -35,16 +36,23 @@ device_files = [folder + '/w1_slave' for folder in device_folders]
 
 # Function to read raw temperature data from a sensor
 def read_temp_raw(device_file):
-    with open(device_file, 'r') as f:
-        lines = f.readlines()
-    return lines
+    try:
+        with open(device_file, 'r') as f:
+            lines = f.readlines()
+        return lines
+    except (FileNotFoundError, IOError):
+        return []  # Return an empty list if the file cannot be read
 
 # Function to extract the temperature in Celsius
 def read_temp(device_file):
     lines = read_temp_raw(device_file)
+    if len(lines) < 2:  # Ensure there are at least 2 lines
+        return None  # Return None if data is incomplete or corrupted
     while lines[0].strip()[-3:] != 'YES':
         time.sleep(0.2)
         lines = read_temp_raw(device_file)
+        if len(lines) < 2:  # Re-check after reading again
+            return None
     equals_pos = lines[1].find('t=')
     if equals_pos != -1:
         temp_string = lines[1][equals_pos+2:]
@@ -95,9 +103,22 @@ buttons = [
 # Load and scale the temperature icon
 try:
     icon = pygame.image.load('/home/PhotoRX/Downloads/Tempicon32.png')
-    icon = pygame.transform.scale(icon, (160, 220))
+    icon = pygame.transform.scale(icon, (180, 210))
 except:
     icon = temp_font.render("\u00B0", True, WHITE)
+
+# Sensor data management
+sensor_data = [None] * len(device_files)
+
+def sensor_thread():
+    """Thread to continuously read temperature data from sensors."""
+    while True:
+        for idx, device_file in enumerate(device_files):
+            sensor_data[idx] = read_temp(device_file)
+        time.sleep(1)  # Adjust to reduce CPU usage
+
+# Start sensor reading thread
+threading.Thread(target=sensor_thread, daemon=True).start()
 
 # Main loop to display screens
 current_screen = "temperature"  # Start with the temperature screen
@@ -131,24 +152,30 @@ while running:
     if current_screen == "temperature":
         # Temperature screen
         title_text = title_font.render("PhotoScale", True, TITLE_COLOR)
-        title_rect = title_text.get_rect(center=(screen.get_width() // 2, 50))
+        title_rect = title_text.get_rect(center=(screen.get_width() // 2, 60))
         screen.blit(title_text, title_rect)
 
-        # Display temperature data for each sensor in two columns
-        left_x = 140
-        right_x = 410
-        y_start = 130
-        y_offset = 80  # Space between sensor readings
+        # Display temperature data for each sensor
+        left_x, right_x = 180, 620  # Left and right alignment
+        y_start = 130  # Start position for sensor data
+        y_gap = 100  # Gap between each sensor
 
-        for idx, device_file in enumerate(device_files):
-            temp_c = read_temp(device_file)
-            temp_c_text = temp_font.render(f'R{idx+1}: {temp_c:.2f}\u00B0C', True, RED)
-            x_position = left_x if idx < 4 else right_x
-            y_position = y_start + (idx % 4) * y_offset
-            screen.blit(temp_c_text, (x_position, y_position))
+        for idx in range(4):  # First 4 sensors on the left
+            temp_c = sensor_data[idx]
+            temp_display = f'{temp_c:.2f} \u00B0C' if temp_c is not None else 'N/A'
+            temp_c_text = temp_font.render(f'R{idx+1}: {temp_display}', True, RED)
+            screen.blit(temp_c_text, (left_x, y_start + idx * y_gap))
 
-        # Temperature icon remains on the right
-        screen.blit(icon, (650, 140))
+        for idx in range(4, 8):  # Next 4 sensors on the right
+            temp_c = sensor_data[idx]
+            temp_display = f'{temp_c:.2f} \u00B0C' if temp_c is not None else 'N/A'
+            temp_c_text = temp_font.render(f'R{idx+1}: {temp_display}', True, RED)
+            screen.blit(temp_c_text, (right_x, y_start + (idx - 4) * y_gap))
+
+        # Display the temperature icon
+        icon_x = 860
+        icon_y = 130
+        screen.blit(icon, (icon_x, 130))
 
     elif current_screen == "settings":
         # Settings screen
@@ -164,7 +191,7 @@ while running:
 
     # Update the display
     pygame.display.flip()
-    time.sleep(0.05)  # Adjust refresh rate
+    time.sleep(0.1)  # Adjust refresh rate
 
 # Quit Pygame on exit
 pygame.quit()
