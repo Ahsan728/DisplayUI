@@ -17,8 +17,8 @@ screen = pygame.display.set_mode((1024, 600), pygame.FULLSCREEN)
 
 # Set up fonts for title and temperature
 title_font = pygame.font.Font(None, 120)  # Font for the title
-temp_font = pygame.font.Font(None, 80)    # Font for temperature
-settings_font = pygame.font.Font(None, 60)  # Smaller font for Settings screen text
+temp_font = pygame.font.Font(None, 60)    # Font for temperature
+settings_font = pygame.font.Font(None, 40)  # Smaller font for Settings screen text
 
 # Define colors
 WHITE = (255, 255, 255)
@@ -85,6 +85,34 @@ class Button:
     def reset_color(self):
         self.highlighted = False
 
+# Define slider class
+class Slider:
+    def __init__(self, x, y, width, min_val, max_val, value, label):
+        self.rect = pygame.Rect(x, y, width, 20)
+        self.knob_rect = pygame.Rect(x + (value / max_val) * width - 10, y - 10, 20, 40)
+        self.min_val = min_val
+        self.max_val = max_val
+        self.value = value
+        self.label = label
+        self.dragging = False
+
+    def draw(self, screen):
+        pygame.draw.line(screen, WHITE, (self.rect.x, self.rect.y + 10), 
+                         (self.rect.x + self.rect.width, self.rect.y + 10), 4)
+        pygame.draw.rect(screen, WHITE, self.knob_rect)
+        label_text = settings_font.render(f"{self.label}: {int(self.value)}", True, WHITE)
+        screen.blit(label_text, (self.rect.x, self.rect.y - 40))
+
+    def handle_event(self, event):
+        if event.type == MOUSEBUTTONDOWN and self.knob_rect.collidepoint(event.pos):
+            self.dragging = True
+        elif event.type == MOUSEBUTTONUP:
+            self.dragging = False
+        elif event.type == MOUSEMOTION and self.dragging:
+            new_x = max(self.rect.x, min(event.pos[0], self.rect.x + self.rect.width))
+            self.knob_rect.x = new_x - 10
+            self.value = (new_x - self.rect.x) / self.rect.width * (self.max_val - self.min_val)
+
 # Define actions for each button
 def show_temperature_screen():
     global current_screen
@@ -107,6 +135,15 @@ try:
 except:
     icon = temp_font.render("\u00B0", True, WHITE)
 
+
+# Load and scale the temperature icon
+try:
+    icon2 = pygame.image.load('/home/PhotoRX/Downloads/Brightness1.png')
+    icon2 = pygame.transform.scale(icon2, (135, 150))
+except:
+    icon2 = temp_font.render("\u00B0", True, WHITE)
+
+
 # Sensor data management
 sensor_data = [None] * len(device_files)
 
@@ -120,6 +157,14 @@ def sensor_thread():
 # Start sensor reading thread
 threading.Thread(target=sensor_thread, daemon=True).start()
 
+# Initialize sliders
+sliders = [
+    Slider(200, 190, 400, 0, 100, 0, "Right Reactor"),
+    Slider(200, 270, 400, 0, 100, 0, "Left Reactor"),
+    Slider(200, 350, 400, 0, 100, 0, "Top Reactor"),
+    Slider(200, 430, 400, 0, 100, 0, "Bottom Reactor"),
+]
+
 # Main loop to display screens
 current_screen = "temperature"  # Start with the temperature screen
 running = True
@@ -130,16 +175,16 @@ while running:
         elif event.type == KEYDOWN:
             if event.key == K_ESCAPE:
                 running = False
-        elif event.type == MOUSEBUTTONDOWN:
-            pos = pygame.mouse.get_pos()
+        elif event.type in (MOUSEBUTTONDOWN, MOUSEMOTION, MOUSEBUTTONUP):
             for button in buttons:
-                if button.is_clicked(pos):
+                if event.type == MOUSEBUTTONDOWN and button.is_clicked(event.pos):
                     button.highlight()
                     button.action()
-
-        elif event.type == MOUSEBUTTONUP:
-            for button in buttons:
-                button.reset_color()
+                elif event.type == MOUSEBUTTONUP:
+                    button.reset_color()
+            if current_screen == "settings":
+                for slider in sliders:
+                    slider.handle_event(event)
 
     # Fill the screen with a color (black)
     screen.fill((0, 0, 0))
@@ -156,9 +201,9 @@ while running:
         screen.blit(title_text, title_rect)
 
         # Display temperature data for each sensor
-        left_x, right_x = 180, 620  # Left and right alignment
-        y_start = 130  # Start position for sensor data
-        y_gap = 100  # Gap between each sensor
+        left_x, right_x = 140, 410  # Left and right alignment
+        y_start = 140  # Start position for sensor data
+        y_gap = 80  # Gap between each sensor
 
         for idx in range(4):  # First 4 sensors on the left
             temp_c = sensor_data[idx]
@@ -173,9 +218,8 @@ while running:
             screen.blit(temp_c_text, (right_x, y_start + (idx - 4) * y_gap))
 
         # Display the temperature icon
-        icon_x = 860
-        icon_y = 130
-        screen.blit(icon, (icon_x, 130))
+        icon_x = 630
+        screen.blit(icon, (icon_x, 150))
 
     elif current_screen == "settings":
         # Settings screen
@@ -183,11 +227,15 @@ while running:
         settings_rect = settings_title.get_rect(center=(screen.get_width() // 2, 60))
         screen.blit(settings_title, settings_rect)
 
-        # Placeholder settings information
-        setting_text_1 = settings_font.render("Right Reactor: Intensity", True, WHITE)
-        setting_text_2 = settings_font.render("Left Reactor: Intensity", True, WHITE)
-        screen.blit(setting_text_1, (200, 200))
-        screen.blit(setting_text_2, (200, 300))
+        # Draw sliders
+        for slider in sliders:
+            slider.draw(screen)
+
+        # Draw the new icon in the desired position (to the right of the sliders)
+        icon2_x = 640
+        screen.blit(icon2, (icon2_x, 125))
+
+            
 
     # Update the display
     pygame.display.flip()
