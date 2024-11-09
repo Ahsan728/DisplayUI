@@ -27,8 +27,8 @@ TITLE_COLOR = (255, 215, 0)  # Gold color for title
 BUTTON_HIGHLIGHT = (0, 180, 180)  # Highlight color for buttons on touch
 
 # Initialize temperature sensors
-os.system('modprobe w1-gpio')
-os.system('modprobe w1-therm')
+#os.system('modprobe w1-gpio')
+#os.system('modprobe w1-therm')
 
 base_dir = '/sys/bus/w1/devices/'
 device_folders = glob.glob(base_dir + '28*')  # Detect all devices starting with '28'
@@ -122,21 +122,24 @@ def show_settings_screen():
     global current_screen
     current_screen = "settings"
 
+def show_developer_screen():
+    global current_screen
+    current_screen = "developer"
+
 # Initialize buttons with icons
 buttons = [
-    Button("/home/PhotoRX/Downloads/menu.png", 22, 150, 88, 90, show_temperature_screen),  # Home Icon
-    Button("/home/PhotoRX/Downloads/sett2.png", 22, 270, 88, 90, show_settings_screen),  # Settings Icon
+    Button("/home/PhotoRX/Downloads/menu.png", 22, 130, 88, 90, show_temperature_screen),  # Home Icon
+    Button("/home/PhotoRX/Downloads/sett2.png", 22, 245, 88, 90, show_settings_screen),    # Settings Icon
+    Button("/home/PhotoRX/Downloads/Dev.png", 22, 360, 86, 88, show_developer_screen)  # Developer Icon
 ]
 
-# Load and scale the temperature icon
+# Load and scale icons
 try:
     icon = pygame.image.load('/home/PhotoRX/Downloads/Tempicon32.png')
     icon = pygame.transform.scale(icon, (180, 210))
 except:
     icon = temp_font.render("\u00B0", True, WHITE)
 
-
-# Load and scale the temperature icon
 try:
     icon2 = pygame.image.load('/home/PhotoRX/Downloads/Brightness1.png')
     icon2 = pygame.transform.scale(icon2, (135, 150))
@@ -144,6 +147,26 @@ except:
     icon2 = temp_font.render("\u00B0", True, WHITE)
 
 
+# Load and scale logos for developer screen
+try:
+    logo1 = pygame.image.load('/home/PhotoRX/Downloads/ICIQlogo.png')
+    logo1 = pygame.transform.scale(logo1, (120, 120))
+except:
+    logo1 = None
+
+try:
+    logo2 = pygame.image.load('/home/PhotoRX/Downloads/JLFlab.png')
+    logo2 = pygame.transform.scale(logo2, (120, 120))
+except:
+    logo2 = None
+    
+# Load and scale QR code icon for developer screen
+try:
+    qr_code_icon = pygame.image.load('/home/PhotoRX/Downloads/QRcode.png')
+    qr_code_icon = pygame.transform.scale(qr_code_icon, (200, 200))
+except:
+    qr_code_icon = None
+    
 # Sensor data management
 sensor_data = [None] * len(device_files)
 
@@ -152,7 +175,7 @@ def sensor_thread():
     while True:
         for idx, device_file in enumerate(device_files):
             sensor_data[idx] = read_temp(device_file)
-        time.sleep(1)  # Adjust to reduce CPU usage
+        time.sleep(0.1)  # Adjust to reduce CPU usage
 
 # Start sensor reading thread
 threading.Thread(target=sensor_thread, daemon=True).start()
@@ -235,7 +258,27 @@ while running:
         icon2_x = 640
         screen.blit(icon2, (icon2_x, 125))
 
-            
+    elif current_screen == "developer":
+        screen.fill(WHITE)
+        # Developer screen
+        developer_title = title_font.render("Developer", True, TITLE_COLOR)
+        developer_rect = developer_title.get_rect(center=(screen.get_width() // 2, 60))
+        screen.blit(developer_title, developer_rect)
+    
+        # Ensure buttons are drawn with visible borders on white background
+        for button in buttons:
+            pygame.draw.rect(screen, (200, 200, 200), button.rect.inflate(10, 10), border_radius=10)  # Light grey border
+            button.draw(screen)
+        
+        # Display logos
+        if logo1:
+            screen.blit(logo1, (300, 120))  # Adjust x, y as needed for logo1
+        if logo2:
+            screen.blit(logo2, (420, 120))  # Adjust x, y as needed for logo2
+
+        # Display QR code icon
+        if qr_code_icon:
+            screen.blit(qr_code_icon, (320, 260))  # Adjust x, y as needed for QR code icon
 
     # Update the display
     pygame.display.flip()
