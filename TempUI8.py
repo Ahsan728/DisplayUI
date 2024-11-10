@@ -27,8 +27,8 @@ TITLE_COLOR = (255, 215, 0)  # Gold color for title
 BUTTON_HIGHLIGHT = (0, 180, 180)  # Highlight color for buttons on touch
 
 # Initialize temperature sensors
-#os.system('modprobe w1-gpio')
-#os.system('modprobe w1-therm')
+os.system('modprobe w1-gpio')
+os.system('modprobe w1-therm')
 
 base_dir = '/sys/bus/w1/devices/'
 device_folders = glob.glob(base_dir + '28*')  # Detect all devices starting with '28'
@@ -57,8 +57,13 @@ def read_temp(device_file):
     if equals_pos != -1:
         temp_string = lines[1][equals_pos+2:]
         temp_c = float(temp_string) / 1000.0
+        
+        # Filter out unrealistic or error readings
+        if temp_c == 85.0 or temp_c < -10.0 or temp_c > 100.0:
+            return None  # Mark as error
         return temp_c
     return None
+
 
 # Define button class
 class Button:
@@ -182,10 +187,10 @@ threading.Thread(target=sensor_thread, daemon=True).start()
 
 # Initialize sliders
 sliders = [
-    Slider(200, 190, 400, 0, 100, 0, "Right Reactor"),
-    Slider(200, 270, 400, 0, 100, 0, "Left Reactor"),
-    Slider(200, 350, 400, 0, 100, 0, "Top Reactor"),
-    Slider(200, 430, 400, 0, 100, 0, "Bottom Reactor"),
+    Slider(170, 170, 450, 0, 100, 0, "Right Reactor"),
+    Slider(170, 250, 450, 0, 100, 0, "Left Reactor"),
+    Slider(170, 330, 450, 0, 100, 0, "Top Reactor"),
+    Slider(170, 410, 450, 0, 100, 0, "Bottom Reactor"),
 ]
 
 # Main loop to display screens
@@ -230,13 +235,13 @@ while running:
 
         for idx in range(4):  # First 4 sensors on the left
             temp_c = sensor_data[idx]
-            temp_display = f'{temp_c:.2f} \u00B0C' if temp_c is not None else 'N/A'
+            temp_display = f'{temp_c:.2f} \u00B0C' if temp_c is not None else 'Error'
             temp_c_text = temp_font.render(f'R{idx+1}: {temp_display}', True, RED)
             screen.blit(temp_c_text, (left_x, y_start + idx * y_gap))
 
         for idx in range(4, 8):  # Next 4 sensors on the right
             temp_c = sensor_data[idx]
-            temp_display = f'{temp_c:.2f} \u00B0C' if temp_c is not None else 'N/A'
+            temp_display = f'{temp_c:.2f} \u00B0C' if temp_c is not None else 'Error'
             temp_c_text = temp_font.render(f'R{idx+1}: {temp_display}', True, RED)
             screen.blit(temp_c_text, (right_x, y_start + (idx - 4) * y_gap))
 
