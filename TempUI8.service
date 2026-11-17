@@ -1,0 +1,16 @@
+[Unit]
+Description=Temperature Monitoring Script
+After=multi-user.target
+
+[Service]
+Environment="DISPLAY=:0"
+Environment="XDG_RUNTIME_DIR=/run/user/1000"  
+ExecStart=/home/photorx2/init_sensors.sh  
+WorkingDirectory=/home/photorx2
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=photorx2
+
+[Install]
+WantedBy=multi-user.target
